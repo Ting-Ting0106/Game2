@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>領主五子棋 V14.4</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg: #efe3d0;
+            --grid: #5d4037;
+            --cell: #d2a679;
+            --p1: #2c3e50;
+            --p2: #c0392b;
+            --p1-glow: #3498db;
+            --p2-glow: #e74c3c;
+            --panel: #3d2b24;
+            --accent: #ffeb3b;
+        }
+
+        * {
+            touch-action: manipulation;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            align-items: center;
+        }
+
+        #msg-pop {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: var(--accent);
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 2000;
+            opacity: 0;
+            transition: 0.3s;
+            pointer-events: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 235, 59, 0.3);
+            white-space: nowrap;
+        }
+
+        /* 大廳 */
+        #lobby-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--panel);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .lobby-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            width: 90%;
+            max-width: 350px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .mode-btn {
+            background: var(--accent);
+            color: var(--panel);
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 0;
+            width: 100%;
+        }
+
+        #pvp-setup {
+            display: none;
+            margin-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 15px;
+        }
+
+        .id-display {
+            background: #000;
+            padding: 15px;
+            border-radius: 8px;
+            color: var(--accent);
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 10px 0;
+            cursor: pointer;
+            border: 2px dashed #444;
+        }
+
+        input {
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 18px;
+            text-transform: uppercase;
+        }
+
+        .hint-text {
+            font-size: 12px;
+            color: #ccc;
+            margin-bottom: 5px;
+        }
+
+        /* 陣營標籤 */
+        #my-role-tag {
+            margin-top: 5px;
+            padding: 3px 15px;
+            border-radius: 15px;
+            font-weight: bold;
+            color: white;
+            font-size: 12px;
+            display: none;
+        }
+
+        .tag-blue {
+            background: var(--p1);
+            border: 1px solid var(--p1-glow);
+        }
+
+        .tag-red {
+            background: var(--p2);
+            border: 1px solid var(--p2-glow);
+        }
+
+        #turn-indicator {
+            width: 100%;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: 900;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .turn-my {
+            background: var(--p1);
+        }
+
+        .turn-opp {
+            background: var(--p2);
+        }
+
+        #timer-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff4757;
+            height: 25px;
+            margin-top: 5px;
+            text-shadow: 1px 1px 0px #fff;
+        }
+
+        /* 佈局 */
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 10px 0;
+            flex: 1;
+        }
+
+        #card-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .card-preview {
+            width: 70px;
+            height: 95px;
+            background: #fff;
+            border: 4px solid var(--grid);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .glow-p1 {
+            animation: glow-blue 1.5s infinite;
+            border-color: var(--p1-glow) !important;
+        }
+
+        .glow-p2 {
+            animation: glow-red 1.5s infinite;
+            border-color: var(--p2-glow) !important;
+        }
+
+        @keyframes glow-blue {
+            0% {
+                box-shadow: 0 0 5px var(--p1-glow);
+            }
+
+            50% {
+                box-shadow: 0 0 20px var(--p1-glow);
+            }
+
+            100% {
+                box-shadow: 0 0 5px var(--p1-glow);
+            }
+        }
+
+        @keyframes glow-red {
+            0% {
+                box-shadow: 0 0 5px var(--p2-glow);
+            }
+
+            50% {
+                box-shadow: 0 0 20px var(--p2-glow);
+            }
+
+            100% {
+                box-shadow: 0 0 5px var(--p2-glow);
+            }
+        }
+
+        #board {
+            display: grid;
+            background: var(--grid);
+            gap: 1px;
+            border: 4px solid var(--grid);
+            width: min(95vw, 55dvh);
+            aspect-ratio: 1/1;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .cell {
+            background: var(--cell);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .piece {
+            width: 90%;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            font-size: 20px;
+        }
+
+        .piece.player {
+            background: var(--p1);
+            color: white;
+        }
+
+        .piece.ai {
+            background: var(--p2);
+            color: white;
+        }
+
+        .piece.lord {
+            border-radius: 4px;
+        }
+
+        .piece.knight,
+        .piece.mage {
+            border-radius: 50%;
+        }
+
+        .dir-hint {
+            font-size: 14px;
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            background: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #333;
+            color: #000;
+            font-weight: bold;
+        }
+
+        /* 卡牌說明區 */
+        #card-guide {
+            width: 98%;
+            max-width: 500px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            padding: 8px;
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-around;
+            gap: 5px;
+            border: 1px solid rgba(93, 64, 55, 0.3);
+        }
+
+        .guide-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .guide-icon {
+            font-size: 24px;
+            margin-bottom: 2px;
+        }
+
+        .guide-desc {
+            font-size: 10px;
+            line-height: 1.2;
+            color: #3d2b24;
+        }
+
+        .guide-title {
+            font-weight: bold;
+            color: #8d4e3a;
+            font-size: 11px;
+            display: block;
+            margin-bottom: 1px;
+        }
+
+        /* ✨ 新增：勝負提示框 */
+        #win-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 500;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #win-modal.show {
+            display: flex;
+        }
+
+        .win-box {
+            background: white;
+            padding: 40px 50px;
+            border-radius: 25px;
+            text-align: center;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .win-title {
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            animation: pulse-text 1s infinite;
+        }
+
+        @keyframes pulse-text {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .win-desc {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 30px;
+            font-weight: bold;
+        }
+
+        .win-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .win-btn {
+            padding: 15px 35px;
+            border: none;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .win-btn-play {
+            background: var(--p1);
+            color: white;
+        }
+
+        .win-btn-play:hover {
+            background: #1a5f7a;
+            transform: scale(1.05);
+        }
+
+        .win-btn-back {
+            background: #ddd;
+            color: #333;
+        }
+
+        .win-btn-back:hover {
+            background: #bbb;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="lobby-overlay">
+        <div class="lobby-card">
+            <h1 style="margin-bottom:20px">領主五子棋</h1>
+            <button class="mode-btn" onclick="startAI()">🤖 單人挑戰 AI</button>
+            <button class="mode-btn" style="background:#ddd" onclick="showPVP()">🤝 好友連線</button>
+            <div id="pvp-setup">
+                <div class="hint-text">你的房間代碼 (點擊複製):</div>
+                <div class="id-display" id="my-id" onclick="copyID()">生成中...</div>
+                <input type="text" id="peer-id-input" placeholder="輸入好友代碼" maxlength="6">
+                <button class="mode-btn" style="background:#fff; border:2px solid var(--accent)"
+                    onclick="connectToFriend()">加入房間</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✨ 新增：勝負提示框 -->
+    <div id="win-modal">
+        <div class="win-box">
+            <div id="win-title" class="win-title">✨ 你贏了！✨</div>
+            <div id="win-desc" class="win-desc">領地成功守護！</div>
+            <div class="win-buttons">
+                <button class="win-btn win-btn-play" onclick="rematch()">再來一局</button>
+                <button class="win-btn win-btn-back" onclick="goBackToLobby()">返回大廳</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="turn-indicator" class="turn-my">準備中...</div>
+    <div id="my-role-tag"></div>
+    <div id="timer-display"></div>
+
+    <div id="main-container">
+        <div id="board"></div>
+
+        <div id="card-zone">
+            <div class="card-preview" id="game-card">
+                <div id="res-icon" style="font-size:45px">🏰</div>
+                <div id="res-dir" style="font-size:20px; margin-top:2px"></div>
+            </div>
+            <div style="font-size: 14px; font-weight: bold; color: var(--grid); margin-top: 3px;">手牌</div>
+        </div>
+
+        <div id="card-guide">
+            <div class="guide-item">
+                <div class="guide-icon">🏰</div>
+                <div class="guide-desc">
+                    <span class="guide-title">領主 (Lord)</span>
+                    核心棋子。橫、豎、斜連成 <span style="color:red; font-weight:bold;">5 個</span> 即可勝利。
+                </div>
+            </div>
+            <div class="guide-item">
+                <div class="guide-icon">🐎</div>
+                <div class="guide-desc">
+                    <span class="guide-title">騎士 (Knight)</span>
+                    放置後會沿著箭頭衝撞敵方棋子，敵方消失，騎士也消失。
+                </div>
+            </div>
+            <div class="guide-item">
+                <div class="guide-icon">🧙</div>
+                <div class="guide-desc">
+                    <span class="guide-title">法師 (Mage)</span>
+                    放置後將左右兩側敵方棋子洗腦成我方。法師不計入連線。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="msg-pop"></div>
+
+    <script type="module" src="src/index.js"></script>
+</body>
+
+</html>
